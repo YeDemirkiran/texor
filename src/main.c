@@ -1,4 +1,17 @@
-/*** includes ***/
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.c                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: yademirk <yademirk@student.42istanbul.c    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/12 18:37:17 by yademirk          #+#    #+#             */
+/*   Updated: 2026/06/12 19:50:21 by yademirk         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+/* This file is a part of the forked Texor project. */
+/* ORIGINAL FILE BY: kyletolle (https://github.com/kyletolle) */
 
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
@@ -18,8 +31,6 @@
 #include <unistd.h>
 
 #include "texor.h"
-
-/*** defines ***/
 
 t_editor_config	E;
 
@@ -80,18 +91,18 @@ void disable_raw_mode()
 
 void enable_raw_mode()
 {
+	struct termios	raw;
+
 	if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1)
 		die("tcgetattr");
 	atexit(disable_raw_mode);
-
-	struct termios raw = E.orig_termios;
+	raw = E.orig_termios;
 	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
 	raw.c_oflag &= ~(OPOST);
 	raw.c_cflag |= (CS8);
 	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
 	raw.c_cc[VMIN] = 0;
 	raw.c_cc[VTIME] = 1;
-
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
 		die("tcsetattr");
 }
@@ -647,24 +658,25 @@ char *editor_rows_to_string(int *buflen)
 
 void editor_open(char *filename)
 {
+	FILE	*fp;
+	char	*line;
+	size_t	line_cap;
+	ssize_t	line_len;
+
 	free(E.filename);
 	E.filename = strdup(filename);
-
 	editor_select_syntax_highlight();
-
-	FILE *fp = fopen(filename, "r");
+	fp = fopen(filename, "r");
 	if (!fp)
 		die("fopen");
-
-	char *line = NULL;
-	size_t linecap = 0;
-	ssize_t linelen;
-	while ((linelen = getline(&line, &linecap, fp)) != -1)
+	line_cap = 0;
+	line = NULL;
+	while ((line_len = getline(&line, &line_cap, fp)) != -1)
 	{
-		while (linelen > 0 && (line[linelen - 1] == '\n' ||
-							   line[linelen - 1] == '\r'))
-			linelen--;
-		editor_insert_row(E.number_of_rows, line, linelen);
+		while (line_len > 0 && (line[line_len - 1] == '\n' ||
+							   line[line_len - 1] == '\r'))
+			line_len--;
+		editor_insert_row(E.number_of_rows, line, line_len);
 	}
 	free(line);
 	fclose(fp);
@@ -991,7 +1003,8 @@ void editor_refresh_screen()
 
 void editor_set_status_message(const char *fmt, ...)
 {
-	va_list ap;
+	va_list	ap;
+
 	va_start(ap, fmt);
 	vsnprintf(E.status_message, sizeof(E.status_message), fmt, ap);
 	va_end(ap);
@@ -1195,39 +1208,40 @@ void editor_process_keypress()
 
 /*** init ***/
 
-void init_editor(t_editor_config* e)
+void init_editor(t_editor_config* config)
 {
-	e->file_position_x = 0;
-	e->file_position_y = 0;
-	e->screen_position_x = 0;
-	e->row_offset = 0;
-	e->column_offset = 0;
-	e->number_of_rows = 0;
-	e->row = NULL;
-	e->dirty = 0;
-	e->filename = NULL;
-	e->status_message[0] = '\0';
-	e->status_message_time = 0;
-	e->syntax = NULL;
-	if (get_window_size(&e->screen_rows, &e->screen_columns) == -1)
+	config->file_position_x = 0;
+	config->file_position_y = 0;
+	config->screen_position_x = 0;
+	config->row_offset = 0;
+	config->column_offset = 0;
+	config->number_of_rows = 0;
+	config->row = NULL;
+	config->dirty = 0;
+	config->filename = NULL;
+	config->status_message[0] = '\0';
+	config->status_message_time = 0;
+	config->syntax = NULL;
+	if (get_window_size(&config->screen_rows, &config->screen_columns) == -1)
 		die("get_window_size");
-	e->screen_rows -= 2;
+	config->screen_rows -= 2;
 }
+
+// Move to somewhere else later
+#define DEFAULT_STATUS_MESSAGE \
+	"ELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find"
 
 int main(int argc, char *argv[])
 {
 	enable_raw_mode();
 	init_editor(&E);
 	if (argc >= 2)
-	{
 		editor_open(argv[1]);
-	}
-	editor_set_status_message(
-		"HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+	editor_set_status_message(DEFAULT_STATUS_MESSAGE);
 	while (1)
 	{
 		editor_refresh_screen();
 		editor_process_keypress();
 	}
-	return 0;
+	return (0);
 }
