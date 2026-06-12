@@ -17,85 +17,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "texor.h"
+
 /*** defines ***/
-
-#define TEXOR_VERSION "0.0.1"
-#define TEXOR_TAB_STOP 8
-#define TEXOR_QUIT_TIMES 2
-
-#define CTRL_KEY(k) ((k) & 0x1f)
-
-typedef enum e_editor_key
-{
-	BACKSPACE = 127,
-	ARROW_LEFT = 1000,
-	ARROW_RIGHT,
-	ARROW_UP,
-	ARROW_DOWN,
-	DEL_KEY,
-	HOME_KEY,
-	END_KEY,
-	PAGE_UP,
-	PAGE_DOWN
-}	t_editor_key;
-
-typedef enum e_editor_highlight
-{
-	HL_NORMAL = 0,
-	HL_COMMENT,
-	HL_MLCOMMENT,
-	HL_KEYWORD1,
-	HL_KEYWORD2,
-	HL_STRING,
-	HL_NUMBER,
-	HL_MATCH
-}	t_editor_highlight;
-
-#define HL_HIGHLIGHT_NUMBERS (1 << 0)
-#define HL_HIGHLIGHT_STRINGS (1 << 1)
-
-/*** data ***/
-
-typedef struct s_editor_syntax
-{
-	char *file_type;
-	char **file_match;
-	char **keywords;
-	char *singleline_comment_start;
-	char *multiline_comment_start;
-	char *multiline_comment_end;
-	int flags;
-}	t_editor_syntax;
-
-typedef struct s_e_row
-{
-	int index;
-	int size;
-	int rendered_size;
-	char *characters;
-	char *rendered_characters;
-	unsigned char *highlight;
-	int highlight_open_comment;
-} t_e_row;
-
-typedef struct s_editor_config
-{
-	int				file_position_x;
-	int				file_position_y;
-	int				screen_position_x;
-	int				row_offset;
-	int				column_offset;
-	int				screen_rows;
-	int				screen_columns;
-	int				number_of_rows;
-	t_e_row			*row;
-	int				dirty;
-	char			*filename;
-	char			status_message[80];
-	time_t			status_message_time;
-	t_editor_syntax	*syntax;
-	struct termios	orig_termios;
-}	t_editor_config;
 
 t_editor_config	E;
 
@@ -906,26 +830,15 @@ void editor_scroll()
 {
 	E.screen_position_x = 0;
 	if (E.file_position_y < E.number_of_rows)
-	{
 		E.screen_position_x = editor_row_file_position_x_to_screen_position_x(&E.row[E.file_position_y], E.file_position_x);
-	}
-
 	if (E.file_position_y < E.row_offset)
-	{
 		E.row_offset = E.file_position_y;
-	}
 	if (E.file_position_y >= E.row_offset + E.screen_rows)
-	{
 		E.row_offset = E.file_position_y - E.screen_rows + 1;
-	}
 	if (E.screen_position_x < E.column_offset)
-	{
 		E.column_offset = E.screen_position_x;
-	}
 	if (E.screen_position_x >= E.column_offset + E.screen_columns)
-	{
 		E.column_offset = E.screen_position_x - E.screen_columns + 1;
-	}
 }
 
 void editor_draw_rows(struct abuf *ab)
@@ -1057,24 +970,21 @@ void editor_draw_message_bar(struct abuf *ab)
 
 void editor_refresh_screen()
 {
+	struct abuf	ab;
+	char		buf[32];
+
+	ab.b = NULL;
+	ab.len = 0;
 	editor_scroll();
-
-	struct abuf ab = ABUF_INIT;
-
 	ab_append(&ab, "\x1b[?25l", 6);
 	ab_append(&ab, "\x1b[H", 3);
-
 	editor_draw_rows(&ab);
 	editor_draw_status_bar(&ab);
 	editor_draw_message_bar(&ab);
-
-	char buf[32];
 	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.file_position_y - E.row_offset) + 1,
 			 (E.screen_position_x - E.column_offset) + 1);
 	ab_append(&ab, buf, strlen(buf));
-
 	ab_append(&ab, "\x1b[?25h", 6);
-
 	write(STDOUT_FILENO, ab.b, ab.len);
 	ab_free(&ab);
 }
@@ -1285,43 +1195,39 @@ void editor_process_keypress()
 
 /*** init ***/
 
-void init_editor()
+void init_editor(t_editor_config* e)
 {
-	E.file_position_x = 0;
-	E.file_position_y = 0;
-	E.screen_position_x = 0;
-	E.row_offset = 0;
-	E.column_offset = 0;
-	E.number_of_rows = 0;
-	E.row = NULL;
-	E.dirty = 0;
-	E.filename = NULL;
-	E.status_message[0] = '\0';
-	E.status_message_time = 0;
-	E.syntax = NULL;
-
-	if (get_window_size(&E.screen_rows, &E.screen_columns) == -1)
+	e->file_position_x = 0;
+	e->file_position_y = 0;
+	e->screen_position_x = 0;
+	e->row_offset = 0;
+	e->column_offset = 0;
+	e->number_of_rows = 0;
+	e->row = NULL;
+	e->dirty = 0;
+	e->filename = NULL;
+	e->status_message[0] = '\0';
+	e->status_message_time = 0;
+	e->syntax = NULL;
+	if (get_window_size(&e->screen_rows, &e->screen_columns) == -1)
 		die("get_window_size");
-	E.screen_rows -= 2;
+	e->screen_rows -= 2;
 }
 
 int main(int argc, char *argv[])
 {
 	enable_raw_mode();
-	init_editor();
+	init_editor(&E);
 	if (argc >= 2)
 	{
 		editor_open(argv[1]);
 	}
-
 	editor_set_status_message(
 		"HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
-
 	while (1)
 	{
 		editor_refresh_screen();
 		editor_process_keypress();
 	}
-
 	return 0;
 }
