@@ -21,11 +21,11 @@
 
 #define TEXOR_VERSION "0.0.1"
 #define TEXOR_TAB_STOP 8
-#define TEXOR_QUIT_TIMES 3
+#define TEXOR_QUIT_TIMES 2
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
-enum editorKey
+typedef enum e_editor_key
 {
 	BACKSPACE = 127,
 	ARROW_LEFT = 1000,
@@ -37,9 +37,9 @@ enum editorKey
 	END_KEY,
 	PAGE_UP,
 	PAGE_DOWN
-};
+}	t_editor_key;
 
-enum editorHighlight
+typedef enum e_editor_highlight
 {
 	HL_NORMAL = 0,
 	HL_COMMENT,
@@ -49,14 +49,14 @@ enum editorHighlight
 	HL_STRING,
 	HL_NUMBER,
 	HL_MATCH
-};
+}	t_editor_highlight;
 
 #define HL_HIGHLIGHT_NUMBERS (1 << 0)
 #define HL_HIGHLIGHT_STRINGS (1 << 1)
 
 /*** data ***/
 
-struct editorSyntax
+typedef struct s_editor_syntax
 {
 	char *file_type;
 	char **file_match;
@@ -65,9 +65,9 @@ struct editorSyntax
 	char *multiline_comment_start;
 	char *multiline_comment_end;
 	int flags;
-};
+}	t_editor_syntax;
 
-typedef struct erow
+typedef struct s_e_row
 {
 	int index;
 	int size;
@@ -76,27 +76,28 @@ typedef struct erow
 	char *rendered_characters;
 	unsigned char *highlight;
 	int highlight_open_comment;
-} erow;
+} t_e_row;
 
-struct editorConfig
+typedef struct s_editor_config
 {
-	int file_position_x, file_position_y;
-	int screen_position_x;
-	int row_offset;
-	int column_offset;
-	int screen_rows;
-	int screen_columns;
-	int number_of_rows;
-	erow *row;
-	int dirty;
-	char *filename;
-	char status_message[80];
-	time_t status_message_time;
-	struct editorSyntax *syntax;
-	struct termios orig_termios;
-};
+	int				file_position_x;
+	int				file_position_y;
+	int				screen_position_x;
+	int				row_offset;
+	int				column_offset;
+	int				screen_rows;
+	int				screen_columns;
+	int				number_of_rows;
+	t_e_row			*row;
+	int				dirty;
+	char			*filename;
+	char			status_message[80];
+	time_t			status_message_time;
+	t_editor_syntax	*syntax;
+	struct termios	orig_termios;
+}	t_editor_config;
 
-struct editorConfig E;
+t_editor_config	E;
 
 /*** filetypes ***/
 
@@ -116,7 +117,7 @@ char *RUBY_HL_keywords[] = {
 	"or", "redo", "rescue", "retry", "return", "self", "super", "then", "true",
 	"undef", "unless", "until", "when", "while", "yield", NULL};
 
-struct editorSyntax HLDB[] = {
+t_editor_syntax HLDB[] = {
 	{"c",
 	 C_HL_extensions,
 	 C_HL_keywords,
@@ -306,7 +307,7 @@ int is_separator(int c)
 	return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
 }
 
-void editorUpdateSyntax(erow *row)
+void editorUpdateSyntax(t_e_row *row)
 {
 	row->highlight = realloc(row->highlight, row->rendered_size);
 	memset(row->highlight, HL_NORMAL, row->rendered_size);
@@ -478,7 +479,7 @@ void editorSelectSyntaxHighlight()
 
 	for (unsigned int j = 0; j < HLDB_ENTRIES; j++)
 	{
-		struct editorSyntax *s = &HLDB[j];
+		struct s_editor_syntax *s = &HLDB[j];
 		unsigned int i = 0;
 		while (s->file_match[i])
 		{
@@ -503,7 +504,7 @@ void editorSelectSyntaxHighlight()
 
 /*** row operations ***/
 
-int editorRowFilePositionXToScreenPositionX(erow *row, int file_position_x)
+int editorRowFilePositionXToScreenPositionX(t_e_row *row, int file_position_x)
 {
 	int screen_position_x = 0;
 	int j;
@@ -516,7 +517,7 @@ int editorRowFilePositionXToScreenPositionX(erow *row, int file_position_x)
 	return screen_position_x;
 }
 
-int editorRowScreenPositionXToFilePositionX(erow *row, int screen_position_x)
+int editorRowScreenPositionXToFilePositionX(t_e_row *row, int screen_position_x)
 {
 	int cur_screen_position_x = 0;
 	int file_position_x;
@@ -532,7 +533,7 @@ int editorRowScreenPositionXToFilePositionX(erow *row, int screen_position_x)
 	return file_position_x;
 }
 
-void editorUpdateRow(erow *row)
+void editorUpdateRow(t_e_row *row)
 {
 	int tabs = 0;
 	int j;
@@ -568,8 +569,8 @@ void editorInsertRow(int at, char *s, size_t len)
 	if (at < 0 || at > E.number_of_rows)
 		return;
 
-	E.row = realloc(E.row, sizeof(erow) * (E.number_of_rows + 1));
-	memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.number_of_rows - at));
+	E.row = realloc(E.row, sizeof(t_e_row) * (E.number_of_rows + 1));
+	memmove(&E.row[at + 1], &E.row[at], sizeof(t_e_row) * (E.number_of_rows - at));
 	for (int j = at + 1; j <= E.number_of_rows; j++)
 		E.row[j].index++;
 
@@ -590,7 +591,7 @@ void editorInsertRow(int at, char *s, size_t len)
 	E.dirty++;
 }
 
-void editorFreeRow(erow *row)
+void editorFreeRow(t_e_row *row)
 {
 	free(row->rendered_characters);
 	free(row->characters);
@@ -602,14 +603,14 @@ void editorDelRow(int at)
 	if (at < 0 || at >= E.number_of_rows)
 		return;
 	editorFreeRow(&E.row[at]);
-	memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.number_of_rows - at - 1));
+	memmove(&E.row[at], &E.row[at + 1], sizeof(t_e_row) * (E.number_of_rows - at - 1));
 	for (int j = at; j < E.number_of_rows - 1; j++)
 		E.row[j].index--;
 	E.number_of_rows--;
 	E.dirty++;
 }
 
-void editorRowInsertChar(erow *row, int at, int c)
+void editorRowInsertChar(t_e_row *row, int at, int c)
 {
 	if (at < 0 || at > row->size)
 		at = row->size;
@@ -621,7 +622,7 @@ void editorRowInsertChar(erow *row, int at, int c)
 	E.dirty++;
 }
 
-void editorRowDelChar(erow *row, int at)
+void editorRowDelChar(t_e_row *row, int at)
 {
 	if (at < 0 || at >= row->size)
 		return;
@@ -643,7 +644,7 @@ void editorInsertChar(int c)
 	E.file_position_x++;
 }
 
-void editorRowAppendString(erow *row, char *s, size_t len)
+void editorRowAppendString(t_e_row *row, char *s, size_t len)
 {
 	row->characters = realloc(row->characters, row->size + len + 1);
 	memcpy(&row->characters[row->size], s, len);
@@ -661,7 +662,7 @@ void editorInsertNewline()
 	}
 	else
 	{
-		erow *row = &E.row[E.file_position_y];
+		t_e_row *row = &E.row[E.file_position_y];
 		editorInsertRow(E.file_position_y + 1, &row->characters[E.file_position_x], row->size - E.file_position_x);
 		row = &E.row[E.file_position_y];
 		row->size = E.file_position_x;
@@ -679,7 +680,7 @@ void editorDelChar()
 	if (E.file_position_x == 0 && E.file_position_y == 0)
 		return;
 
-	erow *row = &E.row[E.file_position_y];
+	t_e_row *row = &E.row[E.file_position_y];
 	if (E.file_position_x > 0)
 	{
 		editorRowDelChar(row, E.file_position_x - 1);
@@ -828,7 +829,7 @@ void editorFindCallback(char *query, int key)
 		else if (current == E.number_of_rows)
 			current = 0;
 
-		erow *row = &E.row[current];
+		t_e_row *row = &E.row[current];
 		char *match = strstr(row->rendered_characters, query);
 		if (match)
 		{
@@ -1141,7 +1142,7 @@ char *editorPrompt(char *prompt, void (*callback)(char *, int))
 
 void editorMoveCursor(int key)
 {
-	erow *row = (E.file_position_y >= E.number_of_rows) ? NULL : &E.row[E.file_position_y];
+	t_e_row *row = (E.file_position_y >= E.number_of_rows) ? NULL : &E.row[E.file_position_y];
 
 	switch (key)
 	{
