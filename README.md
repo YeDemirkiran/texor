@@ -2,6 +2,12 @@
 
 A simple text editor written in C.
 
+This project is a fork of existing project with the same name, by [kyletolle](https://github.com/kyletolle)
+
+This REAME document will soon be updated. The rest of the document is written by kyletolle.
+
+<hr/>
+
 I'm following along with a [tutorial](http://viewsourcecode.org/snaptoken/kilo/) to build an editor like [kilo](http://antirez.com/news/108).
 
 ## Compiling
